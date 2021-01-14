@@ -1,8 +1,10 @@
 package test.pivotal.pal.trackerapi;
 
 import com.jayway.jsonpath.DocumentContext;
+import com.mysql.cj.jdbc.MysqlDataSource;
 import io.pivotal.pal.tracker.PalTrackerApplication;
 import io.pivotal.pal.tracker.TimeEntry;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -11,9 +13,12 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.core.JdbcTemplate;
+
 
 import java.time.LocalDate;
 import java.util.Collection;
+import java.util.TimeZone;
 
 import static com.jayway.jsonpath.JsonPath.parse;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -27,12 +32,22 @@ public class TimeEntryApiTest {
 
     private final long projectId = 123L;
     private final long userId = 456L;
-    private TimeEntry timeEntry = new TimeEntry(projectId, userId, LocalDate.parse("2017-01-08"), 8);
+    private final TimeEntry timeEntry = new TimeEntry(0, projectId, userId, LocalDate.parse("2017-01-08"), 8);
+
+    @BeforeEach
+    public void setUp() throws Exception {
+        MysqlDataSource dataSource = new MysqlDataSource();
+        dataSource.setUrl(System.getenv("SPRING_DATASOURCE_URL"));
+
+        JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
+        jdbcTemplate.execute("TRUNCATE time_entries");
+
+        TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
+    }
 
     @Test
-    public void testCreate() throws Exception {
+    public void testCreate() {
         ResponseEntity<String> createResponse = restTemplate.postForEntity("/time-entries", timeEntry, String.class);
-
 
         assertThat(createResponse.getStatusCode()).isEqualTo(HttpStatus.CREATED);
 
@@ -41,16 +56,14 @@ public class TimeEntryApiTest {
         assertThat(createJson.read("$.projectId", Long.class)).isEqualTo(projectId);
         assertThat(createJson.read("$.userId", Long.class)).isEqualTo(userId);
         assertThat(createJson.read("$.date", String.class)).isEqualTo("2017-01-08");
-        assertThat(createJson.read("$.hours", Long.class)).isEqualTo(8);
+        assertThat(createJson.read("$.hours", Integer.class)).isEqualTo(8);
     }
 
     @Test
-    public void testList() throws Exception {
-        Long id = createTimeEntry();
-
+    public void testList() {
+        long id = createTimeEntry();
 
         ResponseEntity<String> listResponse = restTemplate.getForEntity("/time-entries", String.class);
-
 
         assertThat(listResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
 
@@ -59,17 +72,15 @@ public class TimeEntryApiTest {
         Collection timeEntries = listJson.read("$[*]", Collection.class);
         assertThat(timeEntries.size()).isEqualTo(1);
 
-        Long readId = listJson.read("$[0].id", Long.class);
+        long readId = listJson.read("$[0].id", Long.class);
         assertThat(readId).isEqualTo(id);
     }
 
     @Test
-    public void testRead() throws Exception {
-        Long id = createTimeEntry();
-
+    public void testRead() {
+        long id = createTimeEntry();
 
         ResponseEntity<String> readResponse = this.restTemplate.getForEntity("/time-entries/" + id, String.class);
-
 
         assertThat(readResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
         DocumentContext readJson = parse(readResponse.getBody());
@@ -77,19 +88,17 @@ public class TimeEntryApiTest {
         assertThat(readJson.read("$.projectId", Long.class)).isEqualTo(projectId);
         assertThat(readJson.read("$.userId", Long.class)).isEqualTo(userId);
         assertThat(readJson.read("$.date", String.class)).isEqualTo("2017-01-08");
-        assertThat(readJson.read("$.hours", Long.class)).isEqualTo(8);
+        assertThat(readJson.read("$.hours", Integer.class)).isEqualTo(8);
     }
 
     @Test
-    public void testUpdate() throws Exception {
-        Long id = createTimeEntry();
+    public void testUpdate() {
+        long id = createTimeEntry();
         long projectId = 2L;
         long userId = 3L;
-        TimeEntry updatedTimeEntry = new TimeEntry(projectId, userId, LocalDate.parse("2017-01-09"), 9);
-
+        TimeEntry updatedTimeEntry = new TimeEntry(0, projectId, userId, LocalDate.parse("2017-01-09"), 9);
 
         ResponseEntity<String> updateResponse = restTemplate.exchange("/time-entries/" + id, HttpMethod.PUT, new HttpEntity<>(updatedTimeEntry, null), String.class);
-
 
         assertThat(updateResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
 
@@ -98,16 +107,14 @@ public class TimeEntryApiTest {
         assertThat(updateJson.read("$.projectId", Long.class)).isEqualTo(projectId);
         assertThat(updateJson.read("$.userId", Long.class)).isEqualTo(userId);
         assertThat(updateJson.read("$.date", String.class)).isEqualTo("2017-01-09");
-        assertThat(updateJson.read("$.hours", Long.class)).isEqualTo(9);
+        assertThat(updateJson.read("$.hours", Integer.class)).isEqualTo(9);
     }
 
     @Test
     public void testDelete() throws Exception {
-        Long id = createTimeEntry();
-
+        long id = createTimeEntry();
 
         ResponseEntity<String> deleteResponse = restTemplate.exchange("/time-entries/" + id, HttpMethod.DELETE, null, String.class);
-
 
         assertThat(deleteResponse.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
 
@@ -115,7 +122,7 @@ public class TimeEntryApiTest {
         assertThat(deletedReadResponse.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
 
-    private Long createTimeEntry() {
+    private long createTimeEntry() {
         HttpEntity<TimeEntry> entity = new HttpEntity<>(timeEntry);
 
         ResponseEntity<TimeEntry> response = restTemplate.exchange("/time-entries", HttpMethod.POST, entity, TimeEntry.class);

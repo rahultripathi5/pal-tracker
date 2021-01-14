@@ -1,17 +1,16 @@
 package io.pivotal.pal.tracker;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
 public class InMemoryTimeEntryRepository implements TimeEntryRepository {
-    private final HashMap<Long, TimeEntry> timeEntries = new HashMap<>();
+    private HashMap<Long, TimeEntry> timeEntries = new HashMap<>();
 
     private long currentId = 1L;
 
     @Override
     public TimeEntry create(TimeEntry timeEntry) {
-        long id = currentId++;
+        Long id = currentId++;
 
         TimeEntry newTimeEntry = new TimeEntry(
                 id,
@@ -26,12 +25,7 @@ public class InMemoryTimeEntryRepository implements TimeEntryRepository {
     }
 
     @Override
-    public TimeEntry find(long id) {
-        return timeEntries.get(id);
-    }
-
-    @Override
-    public TimeEntry read(long id) {
+    public TimeEntry find(Long id) {
         return timeEntries.get(id);
     }
 
@@ -41,7 +35,7 @@ public class InMemoryTimeEntryRepository implements TimeEntryRepository {
     }
 
     @Override
-    public TimeEntry update(long id, TimeEntry timeEntry) {
+    public TimeEntry update(Long id, TimeEntry timeEntry) {
         if (find(id) == null) return null;
 
         TimeEntry updatedEntry = new TimeEntry(
@@ -57,7 +51,7 @@ public class InMemoryTimeEntryRepository implements TimeEntryRepository {
     }
 
     @Override
-    public void delete(long id) {
+    public void delete(Long id) {
         timeEntries.remove(id);
     }
 }
